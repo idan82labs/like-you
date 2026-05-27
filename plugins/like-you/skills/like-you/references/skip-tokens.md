@@ -207,6 +207,37 @@ Capture answer in `_meta/skip-overrides.json`.
 
 ---
 
+## Slack channel skip patterns
+
+When Slack ingest is enabled, additional hard-skip rules apply at the channel level (in addition to subject/body scans):
+
+```
+# DM channels — hard skip by default (1:1 too personal)
+^D[A-Z0-9]+$              # Slack DM channel IDs always start with D
+dm-.*
+
+# Sensitive topic prefixes
+^personal[-_].*
+^mental-health[-_].*
+^therapy[-_].*
+^hr[-_].*
+^salary[-_].*
+^comp[-_].*               # compensation
+^legal[-_].*
+^layoffs?[-_].*
+^firing[-_].*
+^private[-_].*
+^founders?[-_].*          # founder-only channels often contain ESG/legal
+^board[-_].*
+
+# Trust signals — strong skip
+.*confidential.*
+.*secret.*
+.*_eyes-only.*
+```
+
+The user can override per-channel via `~/Business/.claude/slack-include.md` (one channel name per line).
+
 ## Marginal cases — flag but don't skip
 
 If a label or folder contains one of these "soft" tokens, add `sensitive: true` to the source frontmatter but ingest the content. The user-facing rule: the skill won't include sensitive-tagged content in any drafted output without the user explicitly confirming.

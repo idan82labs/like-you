@@ -25,6 +25,9 @@ Phase 5 of `SKILL.md` walks this catalog and picks 5–10 skills based on what t
 | `when-to-escalate` | judgment | no | business + hybrid | ≥3 distinct sender→reply-latency patterns (≥5 messages each) detected |
 | `chase-nudge` | content | no | business + hybrid | ≥2 follow-up emails detected (same recipient, ≥3 days apart, no reply between) AND user's voice.md intent rule allows nudging |
 | `respond-as-me-{client}` | content | no | business + hybrid | top-quintile interaction frequency client AND ≥10 sent emails to that client. Cap: 2 total. |
+| `meeting-brief` | content | no | business + hybrid | ≥3 calendar events with external attendees in NEXT 14 days. Outputs: 1-page brief for an upcoming meeting (attendees, context, open items, suggested questions). Reads `context/people/` + `context/projects/` of attendees. |
+| `schedule-meeting` | content | no | business + hybrid | Calendar MCP connected AND ≥10 events in 90d. Outputs: 2-3 candidate slots + draft invite + awaiting-confirm flag. Voice-aware (terse vs. polite per addressee's relationship). |
+| `write-spec` | content | no | business + hybrid | ≥2 Drive files with titles matching `spec\|אפיון\|דרישות\|requirements\|brief\|MVP`. Outputs: multi-page spec doc using design-system.md branding. Reads past specs to lift the user's spec structure. |
 | `family-bills` | content | no | personal + hybrid | ≥3 invoices/bills in inbox in 90d (utility/insurance/medical billing) |
 | `schedule-personal` | content | no | personal + hybrid | ≥5 personal calendar events with family/friends contacts |
 | `quick-reply` | content | no | personal | ≥10 short threads (<3 messages) to friends/family contacts |

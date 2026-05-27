@@ -71,6 +71,7 @@ Run these checks in parallel. Do not move on until all 5 MCP probes return or ti
 | Drive | `mcp__claude_ai_Google_Drive__list_recent_files pageSize=5` | Recommended |
 | Docs | `mcp__claude_ai_Google_Drive__search_files mimeType=application/vnd.google-apps.document` pageSize=5 | Recommended |
 | Sheets | `mcp__claude_ai_Google_Drive__search_files mimeType=...spreadsheet` pageSize=3 | Optional |
+| Slack | `mcp__claude_ai_Slack__list_channels` if available (else skip — Slack MCP not yet universal) | Optional. If connected, list user's channels, filter to ones with ≥5 messages from user in 90d, sample top 3 channels' last 50 messages. Local fallback: Slack workspace export (`.zip` from Settings → Workspace settings → Import/Export Data) — parse the JSON files inside. |
 
 Capture per-source: `connected: bool`, `count_in_window: int`, `latency_ms: int`, `owner_email: str`. Write to `_meta/confidence.json` as you go.
 
@@ -125,6 +126,8 @@ If user says `continue`, re-probe Calendar. If still missing or user picks the f
 **Drive missing:** ask for a folder path. Walk recursively for `.md`, `.docx`, `.pdf`, `.txt`. Skip files >5MB. Use `python-docx` for docx, `pdfplumber` for pdf (text only — flag scanned PDFs and skip).
 
 **Sheets missing:** ask for a folder of `.csv`/`.xlsx`. Use `csv` stdlib + `openpyxl`. Sniff headers for `name|email|company|amount` columns.
+
+**Slack missing:** Slack MCP isn't universally available yet — if no MCP exposes Slack tools, ask whether the user wants to skip Slack ingest or paste a workspace export (`.zip` from Settings → Workspace settings → Import/Export Data). Parse via Python `zipfile` + per-channel JSON. If user says "skip Slack", just note it in `_meta/log.md` and continue. Slack is **optional**, not required.
 
 **Nothing at all:** cold-start. Skip to Phase 4 after the 3 orientation questions, accept a pasted voice sample (≥200 words), write a stub `CLAUDE.md` and `seed-questions.md` with 8 questions whose answers let a future re-run produce something real.
 
@@ -196,6 +199,12 @@ Default vault path is `~/Business`. Ask: "להשתמש בנתיב הזה או א
 
 ### Sheets
 - For each spreadsheet in window, capture sheet names + first 50 rows of each. Write as a single `raw/sheets/{name}.md` with tables in markdown.
+
+### Slack (optional)
+- If Slack MCP connected: list channels the user is a member of, score each by `messages_from_user_in_90d`, take top 3, dump the last 50 messages per channel to `raw/slack/{channel}.md`.
+- **Skip rules**: Hard-skip any DM channel by default (1:1 conversations are too personal-leaning). Hard-skip channels whose names contain any token from `references/skip-tokens.md` (legal/medical/finance/HR equivalents). Common Slack-specific skip patterns: `#personal-*`, `#mental-health-*`, `#hr-*`, `#legal-*`, `#salary-*`, `#1on1-*`, `#dm-*`.
+- For ingested channels: store one file per channel with a `header` block (channel name, member count, last_active), then chronological messages. Anonymize user IDs to display names via context/people/ matching where possible.
+- If Slack export `.zip` provided as fallback: walk the directory, treat each channel JSON as a thread, apply same skip rules.
 
 After Phase 1, count what landed. Update `_meta/confidence.json`. If counts are now below `full` thresholds, recompute mode and note the downgrade.
 
