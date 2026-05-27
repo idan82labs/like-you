@@ -132,9 +132,47 @@ Trained from past proposals in Drive. Procedure: identify company → load past 
 
 Triggered after a calendar event ends OR on user request "follow up on {event}". Procedure: read calendar event description + attendees → identify topics from context/projects/ → draft 1-page recap with: what was decided, what's next, who owes what by when.
 
-### `design-deck` (content, conditional)
+### `design-deck` (content, conditional) — visual-aware
 
-Slide outline only — does not produce design. Procedure: read project + audience → output 6-10 slide bullets with titles. Hand off to a separate design tool.
+**This skill produces actual visually-faithful HTML/PDF output, not a markdown outline.** It reads `context/design-system.md` first and reuses the persistent assets in `raw/visual/assets/` rather than regenerating them.
+
+**Required reads (in order):**
+1. `~/Business/.claude/context/design-system.md` — colors, typography, layout patterns, asset paths.
+2. `~/Business/.claude/context/voice.md` — for headlines and body copy register.
+3. `~/Business/.claude/context/projects/{slug}.md` — the topic the deck is about.
+
+**Procedure:**
+1. Resolve the topic. Identify audience (`relationship:` from people page).
+2. Load tokens from `design-system.md` into a local CSS variable block.
+3. Generate a 5–10 slide outline (titles + body bullets), in the user's voice.
+4. Render each slide as an HTML `<section class="page">` block:
+   - Banner = `<img src="{relative-path-from-output-to-raw/visual/assets/banner.png}">`. **Do NOT inline base64 — use the file.** Copy the asset next to the output HTML if needed.
+   - Headers use the `--header` color from design-system.md.
+   - RTL/LTR per `direction:` field.
+   - Page sizing: `width: 210mm; height: 297mm; @page { size: A4; margin: 0; }`.
+5. After generating, run a self-check: every slide has the banner, every header uses `--header`, no forbidden visual moves from § Forbidden visual moves in design-system.md.
+6. Save HTML next to a copy of the banner asset. Optionally render to PDF via headless Chrome:
+   ```
+   "Google Chrome" --headless --disable-gpu --allow-file-access-from-files --print-to-pdf=out.pdf file://out.html
+   ```
+7. Print to user: path to the HTML + path to the PDF, plus a one-line "compare to {extraction_source} to verify brand fidelity."
+
+**Output format:**
+- One HTML file at `{workspace}/outputs/decks/{topic-slug}-{ISO-date}.html`
+- One copy of the banner asset adjacent to the HTML (`banner.png`)
+- Optionally one rendered PDF at the same path with `.pdf` extension.
+
+**Constraints:**
+- The banner is a FILE, never CSS. If the file is missing, halt and ask the user to re-run Phase 2.5.
+- Headers MUST be `--header` color (not `--ink`, not arbitrary). This is the load-bearing brand signal.
+- No forbidden moves from `design-system.md`'s § Forbidden visual moves.
+- If `direction: rtl`, wrap any English fragments in `<span dir="ltr">` to avoid bidi flips.
+
+### `draft-proposal` (content, conditional) — visual-aware
+
+Same visual pipeline as `design-deck` above, but for proposals (longer-form, with sections + a pricing table). Required reads + procedure + output format are identical, but the layout convention is from `design-system.md` § Layout patterns → "Document/proposal layout" (typically: banner top, date upper-left/right, h1 title, body sections, optional pricing table, signature block, page number bottom-center).
+
+Common addition: a pricing table that uses `--header` color for table headers and totals, hairline `--rule` for separators, `--paper-soft` for the surrounding card.
 
 ### `chase-nudge` (content, conditional)
 
