@@ -72,7 +72,24 @@ Run these checks in parallel. Do not move on until all 5 MCP probes return or ti
 | Docs | `mcp__claude_ai_Google_Drive__search_files mimeType=application/vnd.google-apps.document` pageSize=5 | Recommended |
 | Sheets | `mcp__claude_ai_Google_Drive__search_files mimeType=...spreadsheet` pageSize=3 | Optional |
 
-Capture per-source: `connected: bool`, `count_in_window: int`, `latency_ms: int`. Write to `_meta/confidence.json` as you go.
+Capture per-source: `connected: bool`, `count_in_window: int`, `latency_ms: int`, `owner_email: str`. Write to `_meta/confidence.json` as you go.
+
+### Step 0.1b — Cross-account mismatch check (CRITICAL)
+
+Many users have multiple Google accounts (personal Gmail + work Workspace, founder@x.com + founder.personal@gmail.com). When the MCPs are connected to different accounts, the skill produces a garbage `context/people/` graph because "you" appears as two identities — and worse, personal correspondence (insurance, medical, family) bleeds into the business knowledge base.
+
+After Step 0.1 returns, extract the user's identity from each connected source:
+- **Gmail**: the `sender:` address in the first `in:sent` thread.
+- **Drive**: the `owner:` field on the first `list_recent_files` result.
+- **Calendar**: the authenticated account email if probe succeeded.
+
+If any two differ → **STOP** and ask one prompt before going further:
+
+> **HE:** "שמתי לב לחיבורים מ-2 חשבונות גוגל שונים: **(א) {gmail-email}** ב-Gmail, **(ב) {drive-owner}** ב-Drive. איזה מהם החשבון העסקי שלך? אעבוד רק עם המקורות של החשבון הזה — אחרת תקבל גרף של 'שני אנשים שונים' כשבעצם זה אתה."
+>
+> **EN:** "I detected two different Google accounts: (a) {gmail-email} on Gmail, (b) {drive-owner} on Drive. Which is your business identity? I'll only ingest from that account's sources — otherwise the context graph treats 'you' as two different people."
+
+Lock the answer into `_meta/confidence.json` as `business_identity:` and **drop all sources not associated with that account.** If the user says "both are mine — merge", explicitly merge with `aliases:` frontmatter on the user's own person page and log the choice to `_meta/log.md`. Default to drop, not merge — the personal account usually has data the user does NOT want in business context.
 
 ### Step 0.2 — Determine operating mode
 
@@ -95,7 +112,15 @@ For each MCP that's missing or below threshold, ask **one** prompt (not a wall o
 >
 > **EN:** "Gmail isn't reachable, or fewer than 30 sent messages found. Two options: (a) connect the Gmail MCP and rerun, or (b) drop a `.mbox` export (Google Takeout) or a folder of `.eml` files on disk and paste the path. Either works. Which?"
 
-**Calendar missing:** ask for an `.ics` export (Settings → Export). Parse with the `ics` library.
+**Calendar missing (most common — Calendar MCP requires separate OAuth from Gmail):**
+
+The Calendar MCP returns an error like `"Ask the user to run /mcp and select claude.ai Google Calendar to authenticate"` when not authed. **Surface the in-app recovery first, fallback second.** Print:
+
+> **HE:** "Calendar לא מחובר. 30 שניות לתקן: הקלידו `/mcp` בסשן של Claude Code, בחרו `claude.ai Google Calendar`, השלימו OAuth בדפדפן, חזרו אליי עם 'המשך'. אם אין לכם Google Calendar — דבר אחר, תייצאו `.ics` (Settings → Export) ותדביקו לי את הנתיב."
+>
+> **EN:** "Calendar isn't connected. 30-second fix: in your Claude Code session, type `/mcp`, select `claude.ai Google Calendar`, complete OAuth in browser, come back and say `continue`. No Google Calendar? Export `.ics` (Settings → Export) and paste the path."
+
+If user says `continue`, re-probe Calendar. If still missing or user picks the fallback, parse the `.ics` with the `ics` library (`pip install ics`); filter `ORGANIZER == user_email`.
 
 **Drive missing:** ask for a folder path. Walk recursively for `.md`, `.docx`, `.pdf`, `.txt`. Skip files >5MB. Use `python-docx` for docx, `pdfplumber` for pdf (text only — flag scanned PDFs and skip).
 
@@ -126,7 +151,12 @@ Default vault path is `~/Business`. Ask: "להשתמש בנתיב הזה או א
 ### Gmail
 - Pull only sent threads, newer than 90 days, capped at 200 messages on first run (resumable).
 - For each message, write `raw/gmail/{ISO-date}-{slug-from-subject}.md` with frontmatter (`from`, `to`, `cc`, `date`, `labels`, `thread_id`) and the message body below.
-- **Skip immediately** if any label or any participant's domain hits the skip-list (see `references/skip-tokens.md`).
+- **Hard-skip the entire thread** if ANY of the following match (run all four checks per thread; one match → skip + log to `_meta/skipped.md`):
+  1. Any label hits the EN/HE token list in `references/skip-tokens.md`.
+  2. Any participant's sender/recipient domain matches the domain regex list in `references/skip-tokens.md`.
+  3. The subject line contains any EN/HE skip token (case-insensitive substring).
+  4. The first 500 characters of the message body contain any EN/HE skip token.
+- **Important**: many Gmail MCP implementations expose only IMAP-style labels (`[Imap]/Sent`, etc.) and hide user-defined labels. Do NOT rely on label-matching alone. Subject + body + domain matching is the actual defense.
 - Hebrew subjects: slugify with transliteration via `python-slugify` `lang_code='he'` if installed, else `{ISO-date}-{8-char-hash}.md` with original subject in frontmatter `subject:`.
 - On 429 (rate limit): sleep 30s, print one line ("Google rate-limited — pausing"), continue.
 

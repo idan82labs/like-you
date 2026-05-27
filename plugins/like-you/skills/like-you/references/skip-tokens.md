@@ -1,11 +1,15 @@
 # Privacy hard-skip tokens
 
-The skill skips any source whose `labels:`, folder path, or filename matches a token in this list (case-insensitive, substring match). Tokens are matched against:
+The skill skips any source whose labels, folder path, filename, **subject line**, **sender/recipient domain**, or **body first 500 chars** matches a rule in this file (case-insensitive substring match for tokens; regex match for domain patterns).
 
-- Gmail label names
+**IMPORTANT — many Gmail MCP implementations only expose IMAP-style labels (`[Imap]/Sent`, etc.) and hide user-defined labels.** This means label-matching alone is not sufficient defense. The skill MUST also match against:
+
+- Gmail label names (where exposed)
 - Drive folder paths
 - File names
-- Email subject lines (for marginal cases — adds a `sensitive: true` flag but doesn't skip outright)
+- **Email subject lines** (HARD skip if token matches — not just a soft flag)
+- **Email sender + recipient domains** (regex match against `## Domain hard-skips`)
+- **Email body first 500 chars** (HARD skip if token matches — catches insurance claim numbers, policy IDs, medical refs)
 
 The skip is enforced **before** any LLM call sees the content. Phase 1 (ingest) checks this; Phase 2 (extract) re-checks; CLAUDE.md instructs every downstream session to re-check at output time.
 
@@ -54,6 +58,8 @@ privileged
 משפט
 עורכ-דין
 עו"ד
+תביעה
+תיק תביעה
 רפואי
 רפואה
 בריאות
@@ -73,9 +79,13 @@ privileged
 מס
 מסים
 ביטוח
+ביטוח ישיר
+ביטוח לאומי
+פוליסה
 משאבי-אנוש
 אישי
 פרטי
+פרטית
 משפחה
 משפחתי
 ילדים
@@ -83,33 +93,88 @@ privileged
 משמורת
 סודי
 חסוי
+זוג
+זוגי
+זוגיות
+בקשות זוגיות
+יחסים
+זוגיות וטיפול
+טיפול זוגי
+ירושה
+צו ירושה
+אישור ניהול חשבון
+אישור ניקוי מס
+חשבונית
+משכנתא
+פיצויים
+תאונה
+תאונות
+נפגע
 ```
 
 ---
 
 ## Domain hard-skips (regardless of label)
 
-Any participant in a thread whose email address ends in one of these → skip the whole thread.
+Any participant in a thread whose email address matches one of these regex patterns → skip the whole thread.
+
+### Hardcoded domain regex (always-skip)
 
 ```
-# Israeli health funds (kupot cholim)
-clalit.org.il
-maccabi4u.co.il
-meuhedet.co.il
-leumit.co.il
+# Israeli health funds (kupot cholim) — exact + subdomains
+^.*@(clalit|maccabi4u|meuhedet|leumit|maccabi-health)\.(org|co)\.il$
+^.*@.*\.(clalit|maccabi|meuhedet|leumit)\.(org|co)\.il$
 
-# Generic medical/legal-sounding TLDs and patterns
-*.law
-*.med
-*.gov.il      # government correspondence — extra caution; skip by default
+# Generic medical/legal TLDs and patterns
+^.*@.*\.law(\..+)?$
+^.*@.*\.med(\..+)?$
 
-# Banks (Israeli)
-mizrahi-tefahot.co.il   # NOTE: user-configurable — if user works WITH the bank, they'll uncomment
-hapoalim.co.il
-leumi.co.il
-discountbank.co.il
-fibi.co.il
+# Israeli insurance companies — these often correspond via numeric or obfuscated subdomains
+^.*@5555555\.co\.il$                # ביטוח ישיר (Direct Insurance) representative addresses
+^.*@bituachyashir\..+$
+^.*@(harel|menora|migdal|clal|phoenix|ayalon|shirbit)\.(co\.il|com)$
+^.*@.*\.bituach\..+$                # generic "bituach" (insurance) subdomain
+
+# Israeli government — extra caution; skip by default (user can whitelist if they work WITH gov)
+^.*@.*\.gov\.il$
+^.*@.*\.muni\.il$
+^.*@.*\.idf\.il$
+
+# Israeli courts / legal
+^.*@.*\.court\.gov\.il$
+^.*@.*\.justice\.gov\.il$
+
+# Banks — Israeli (commented; uncomment if you don't work WITH the bank as a client)
+# ^.*@(mizrahi-tefahot|hapoalim|leumi|discountbank|fibi|mercantile|igud|union-bank)\..+$
 ```
+
+### User-configurable bank list
+
+Banks are the tricky case. The deck's intended user (Idan @ 82Labs) has Mizrahi Bank as a *client*, not a private banking relationship — so the entire `mizrahi-tefahot.co.il` domain must NOT be skipped. Other banks the user has private accounts with should be skipped.
+
+Phase 0.4 (orientation questions) asks:
+
+> **HE:** "האם אתה עובד עם בנק כלקוח? אם כן — איזה? אדלג על דומיין הבנקים שאתה לא עובד איתם."
+>
+> **EN:** "Do you work WITH any banks as clients? If yes, which? I'll skip every bank domain you DON'T work with."
+
+Capture the answer in `_meta/skip-overrides.json` as:
+```json
+{ "bank_clients": ["mizrahi-tefahot.co.il"], "bank_personal_skip": ["leumi.co.il", "discountbank.co.il"] }
+```
+
+The skill then dynamically extends the regex list above with the user's personal-skip banks.
+
+### Subject-line content scan (defense in depth)
+
+Even when domain doesn't match, scan the subject line + first 500 chars of body against the EN+HE token lists above. **Hard skip** (not soft flag) on match. This catches:
+
+- "Re: בהמשך לפנייתך [מס' פניה - ...]" — insurance claim correspondence
+- "תיק תביעה מספר: ..." — legal/insurance
+- "תשלום בנושא טיפול ..." — medical/personal payments
+- "Re: בקשות זוגיות" — couples therapy / relationship counseling
+- "אישור ניהול חשבון" — tax/banking confirmation
+- "פוליסה" — insurance policy
 
 The bank list is interesting: **for the deck's intended user**, mizrahi-tefahot may be a *client*, not a private banking relationship. So `mizrahi-tefahot.co.il` should NOT be on the default skip list — but other banks might be. This file ships with the bank skips commented out. The skill asks at pre-flight:
 
