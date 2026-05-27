@@ -63,7 +63,11 @@ privileged
 רפואי
 רפואה
 בריאות
-טיפול
+טיפול רפואי
+טיפול נפשי
+טיפול פסיכולוגי
+טיפול תרופתי
+טיפול זוגי
 פסיכולוג
 פסיכולוגיה
 פסיכיאטר
@@ -72,12 +76,15 @@ privileged
 אבחון
 כספים
 כספי
-כסף
-בנק
+כסף פרטי
+חשבון בנק
+חשבון בנק פרטי
+העברה בנקאית
+כרטיס אשראי
 משכורת
-שכר
-מס
-מסים
+שכר חודשי
+מס הכנסה
+מסים פרטיים
 ביטוח
 ביטוח ישיר
 ביטוח לאומי
@@ -98,18 +105,18 @@ privileged
 זוגיות
 בקשות זוגיות
 יחסים
-זוגיות וטיפול
-טיפול זוגי
 ירושה
 צו ירושה
 אישור ניהול חשבון
 אישור ניקוי מס
-חשבונית
+חשבונית פרטית
+חשבונית אישית
 משכנתא
 פיצויים
 תאונה
 תאונות
 נפגע
+תיק תביעות
 ```
 
 ---
@@ -167,14 +174,30 @@ The skill then dynamically extends the regex list above with the user's personal
 
 ### Subject-line content scan (defense in depth)
 
-Even when domain doesn't match, scan the subject line + first 500 chars of body against the EN+HE token lists above. **Hard skip** (not soft flag) on match. This catches:
+Even when domain doesn't match, scan the subject line + first 500 chars of body against the EN+HE token lists above. **Hard skip** (not soft flag) on match.
 
-- "Re: בהמשך לפנייתך [מס' פניה - ...]" — insurance claim correspondence
-- "תיק תביעה מספר: ..." — legal/insurance
-- "תשלום בנושא טיפול ..." — medical/personal payments
-- "Re: בקשות זוגיות" — couples therapy / relationship counseling
-- "אישור ניהול חשבון" — tax/banking confirmation
+### Tokens that REQUIRE compound matching (false-positive history)
+
+Some Hebrew words are too broad to skip in their bare form because they have legitimate business uses. Match these ONLY in their compound forms listed in the token list above:
+
+- `בנק` (bank) — bare form is a false-positive trap. `בנק שעות` ("block of hours") is a business idiom. Only skip on `חשבון בנק`, `העברה בנקאית`, `חשבון בנק פרטי`.
+- `טיפול` (treatment/handling) — bare form catches IT "treatment", cyber "incident handling", etc. Only skip on `טיפול רפואי`, `טיפול נפשי`, `טיפול פסיכולוגי`, `טיפול תרופתי`, `טיפול זוגי`.
+- `חשבונית` (invoice) — bare form catches every business invoice the user sends. Only skip on `חשבונית פרטית`, `חשבונית אישית`, or in combination with `אישור ניהול חשבון`/`אישור ניקוי מס` (both signal personal tax/banking context).
+- `כסף` (money), `מס` (tax) — same logic. Bare forms too broad. Only skip on `כסף פרטי`, `מס הכנסה`, `מסים פרטיים`.
+
+This list catches:
+
+- "Re: בהמשך לפנייתך [מס' פניה - ...]" — insurance claim correspondence (via `פניה`/`תביעה`/domain)
+- "תיק תביעה מספר: ..." — legal/insurance (via `תיק תביעה`)
+- "תשלום בנושא טיפול רפואי" — medical (via `טיפול רפואי`)
+- "Re: בקשות זוגיות" — couples therapy (via `בקשות זוגיות`/`זוגיות`)
+- "אישור ניהול חשבון פרטי" — personal banking (via `אישור ניהול חשבון`)
 - "פוליסה" — insurance policy
+- "מס הכנסה — דרישה" — tax demands (via `מס הכנסה`)
+
+Does NOT catch (intentional):
+- "חשבונית עבור 300 שעות פיתוח" — business invoice with the word `בנק` as part of `בנק שעות` idiom
+- "תשלום בנושא טיפול סייבר" — IT/cyber handling (bare `טיפול` no longer matches; but `סייבר` may signal sensitive incident — review manually via `_meta/skipped.md` rather than auto-skip)
 
 The bank list is interesting: **for the deck's intended user**, mizrahi-tefahot may be a *client*, not a private banking relationship. So `mizrahi-tefahot.co.il` should NOT be on the default skip list — but other banks might be. This file ships with the bank skips commented out. The skill asks at pre-flight:
 
