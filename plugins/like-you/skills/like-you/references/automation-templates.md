@@ -106,12 +106,37 @@ When Phase 6 writes `automations.md`, lift these blocks. Comment out any whose u
 
 ## Filter rules
 
-Phase 6 filters these 6 templates before writing the file:
+Phase 6 filters these 6 templates before writing the file. Two-stage filter:
 
+**Stage 1: skill availability (automatic)**
 - If `meeting-followup` wasn't generated in Phase 5 → comment block 2 out.
 - If `draft-proposal` wasn't generated → comment blocks 1 (the third arrow) and 4 out.
 - If `chase-nudge` wasn't generated → comment block 5 out.
 - For block 3, replace `@email:client` only if the user has ≥1 person in `context/people/` with `relationship: client`. Otherwise comment.
+
+**Stage 2: user opt-in (interactive, from Phase 6.2)**
+
+Each block above only writes ACTIVE if the user said "yes" in Phase 6.2 for that skill. Otherwise:
+- User said "manual only" → comment block out with `# (skill kept; you said manual-only — invoke with /skill {name})`
+- User said "skip entirely" → don't write block at all; log to `_meta/log.md`
+- User skipped Phase 6 entirely (chose "none" in Step 6.1) → write empty file with placeholder comment
+
+This means the FINAL `automations.md` reflects the user's actual workflow, not a generic dump. The 6 defaults are a SUGGESTION, not the contract.
+
+## Parameter substitution
+
+Phase 6.3 collects values that substitute into the templates:
+
+| Placeholder | Source |
+|---|---|
+| `<top-client-email>` | highest-interaction client from `_meta/entities.json` (Phase 6.3 confirms or replaces) |
+| `<summary-time>` | user's answer to "what time for end-of-day-summary?" (default 18:00) |
+| `<silence-days>` | user's answer for chase-nudge silence threshold (default 3d) |
+| `<triage-cadence>` | user's answer for triage-inbox frequency (default 1h) |
+| `<auto-vs-draft>` | for reply-email: `auto-send: true` or `auto-send: false` (default false in v0.1) |
+| `<weekdays-only>` | boolean — adds `weekdays-only: true` to the block if user opted for business-hours-only |
+
+Templates use `{placeholder}` syntax; Phase 6.4 substitutes from the collected answers before writing.
 
 ---
 
