@@ -137,7 +137,7 @@ Triggered after a calendar event ends OR on user request "follow up on {event}".
 **This skill produces actual visually-faithful HTML/PDF output, not a markdown outline.** It reads `context/design-system.md` first and reuses the persistent assets in `raw/visual/assets/` rather than regenerating them.
 
 **Required reads (in order):**
-1. `~/Business/.claude/context/design-system.md` — colors, typography, layout patterns, asset paths.
+1. `~/Business/.claude/context/design-system.md` — colors, typography, layout patterns, asset paths. Prefer hi-DPI banner asset if both versions exist (`banner-hires.png` over `banner.png`).
 2. `~/Business/.claude/context/voice.md` — for headlines and body copy register.
 3. `~/Business/.claude/context/projects/{slug}.md` — the topic the deck is about.
 
@@ -164,7 +164,10 @@ Triggered after a calendar event ends OR on user request "follow up on {event}".
 
 **Constraints:**
 - The banner is a FILE, never CSS. If the file is missing, halt and ask the user to re-run Phase 2.5.
+- Use the hi-DPI banner asset (`banner-hires.png`, ~5000×600px) if available — the small embedded version (`banner.png`, ~800×100px) softens visibly when scaled to A4 width.
 - Headers MUST be `--header` color (not `--ink`, not arbitrary). This is the load-bearing brand signal.
+- Font stack MUST match `pdffonts`-identified families (loaded via Google Fonts CDN). System-font fallback only. Do NOT default to "Heebo" or "Assistant" if the source used `NotoSansHebrew` — the shapes look different.
+- Headless Chrome must use `--virtual-time-budget=5000` so Google Fonts have time to load before PDF render. Without this, fonts fall back to system defaults silently.
 - No forbidden moves from `design-system.md`'s § Forbidden visual moves.
 - If `direction: rtl`, wrap any English fragments in `<span dir="ltr">` to avoid bidi flips.
 

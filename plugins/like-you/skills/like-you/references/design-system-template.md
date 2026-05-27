@@ -34,11 +34,12 @@ direction: rtl | ltr
 Table listing extracted assets that **skills MUST embed by path, not recreate**.
 
 ```markdown
-| Asset | Path | Use |
-|---|---|---|
-| Header banner | `raw/visual/assets/{slug}-banner.png` | Full-bleed page top |
-| Logo only | `raw/visual/assets/{slug}-logo.png` | Inline references |
-| ... | ... | ... |
+| Asset | Path | Resolution | Use |
+|---|---|---|---|
+| Header banner (hi-DPI) | `raw/visual/assets/{slug}/banner-hires.png` | ~5000×600px | **Preferred** — crisp at A4 width and beyond |
+| Header banner (original) | `raw/visual/assets/{slug}/{slug}-000.png` | source-embedded | Fallback if hi-DPI extraction failed |
+| Logo only | `raw/visual/assets/{slug}/logo.png` | varies | Inline references, small contexts |
+| Photos / decorative | `raw/visual/assets/{slug}/*` | source-embedded | Reuse as-is |
 ```
 
 Then a code-block showing the embed pattern:

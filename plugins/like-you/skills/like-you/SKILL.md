@@ -259,14 +259,41 @@ The visual extraction requires LOCAL image tools. Probe in order:
 
 If NONE installed → write `context/design-system.md` with `confidence: none` body that says: "No image tools detected. Visual extraction skipped. Install via `brew install poppler` to enable." Skip the rest of Phase 2.5.
 
-### Step 2.5.3 — Render to PNG
+### Step 2.5.3 — Render to PNG + extract original embedded assets
 
 For each visual source:
 1. Use `mcp__claude_ai_Google_Drive__download_file_content` with `exportMimeType: 'application/pdf'`.
-2. Decode the base64 payload and write to `raw/visual/decks/{slug}.pdf`.
+2. Decode the base64 payload via `jq -r .content | base64 -d` and write to `raw/visual/decks/{slug}.pdf`.
 3. **Size guard**: if the base64 payload >2MB, fall back to `exportMimeType: 'image/jpeg'` which exports only the first slide. Note this in `_meta/log.md` so the user knows the extraction was partial.
-4. Convert to PNG: `pdftoppm -png -r 110 -f 1 -l 5 {pdf} {output-prefix}` (first 5 pages at 110 DPI is enough for token extraction without bloating disk).
-5. Store outputs at `raw/visual/images/{source-slug}-{page-N}.png`.
+4. **Extract embedded images first** (the originals — logos, photos, icons): `pdfimages -all raw/visual/decks/{slug}.pdf raw/visual/assets/{slug}/{slug}` writes each embedded image as its own PNG/JPEG/etc. These ARE the user's persistent reusable assets — no re-creation needed.
+5. **Render pages for vision analysis**: `pdftoppm -png -r 110 -f 1 -l 5 {pdf} raw/visual/pages/{slug}` (first 5 pages at 110 DPI for vision token extraction).
+
+### Step 2.5.3b — Hi-DPI fallback for low-res embedded assets
+
+`pdfimages` returns the embedded raster at whatever resolution was stored in the PDF. Google Docs often embeds banner images as ~800×100 raster — fine for screen, **too small for print or for re-embedding in new outputs** (will look fuzzy when scaled).
+
+**Fallback rule** — for each extracted asset that will be used as a structural element (banner, header, logo):
+1. Check dimensions via `magick identify`.
+2. If `width < 1500px` (rough threshold for "needs to scale to A4 width without softness"), generate a hi-res version:
+   ```bash
+   pdftoppm -png -r 600 -f 1 -l 1 {pdf} hires-prefix
+   # crop the banner region (top N pixels of A4 at 600 DPI = top ~600px for a 25mm banner)
+   magick hires-prefix-1.png -crop 5100x600+0+0 +repage -trim +repage raw/visual/assets/{slug}/banner-hires.png
+   ```
+3. Use the `-trim` flag to remove whitespace beyond the banner edge. The output is typically ~5000×600px — sharp at any zoom.
+4. **Persist BOTH versions**: the original embedded asset (small, lossless from the source PDF) AND the hi-DPI re-render (larger, derived). Skills should prefer the hi-DPI version unless explicitly told otherwise.
+
+The decision goes into `_meta/log.md` so the user can audit which version was used and why.
+
+### Step 2.5.3c — Identify ACTUAL embedded fonts (don't guess)
+
+Use `pdffonts` to read the actual embedded font names from the source PDF instead of guessing from vision:
+```bash
+pdffonts raw/visual/decks/{slug}.pdf
+```
+This returns font names like `NotoSansHebrew-Regular`, `ArialMT`, `Heebo-Bold`, etc. (often subset-prefixed with `AAAAAA+` etc. — strip the prefix). Cross-reference these against Google Fonts availability so the generated CSS can load the *correct* font, not the LLM's best guess.
+
+If `pdffonts` returns subset fonts only (font files not extractable as TTF), record the font names in `design-system.md`'s `typography` section and load them from Google Fonts CDN. Common Google Docs Hebrew defaults: `Noto Sans Hebrew`, `Heebo`, `Assistant`, `Rubik`, `Open Sans Hebrew`, `Frank Ruhl Libre`, `David Libre`.
 
 ### Step 2.5.4 — Extract design tokens via vision
 
@@ -275,7 +302,7 @@ Read the rendered images. For EACH source, extract:
 - **Primary brand color** (hex) — the dominant accent used for emphasis (titles, callouts).
 - **Secondary/accent colors** (up to 3) — supporting colors.
 - **Neutral palette** — background, text, muted.
-- **Typography**: best-guess font families for headlines and body. If the LLM can't identify the exact font, name the closest open-source analog (e.g., "Inter or Heebo-like sans-serif", "Cardo or Frank Ruhl Libre for Hebrew serif").
+- **Typography**: from `pdffonts` output (step 2.5.3c), not vision. Record the exact font names found in the source PDF. If subset-prefixed (e.g., `AAAAAA+NotoSansHebrew-Regular`), strip the prefix to get the canonical name. Vision is only used as a backup if `pdffonts` returns no usable names.
 - **Logo treatment** — where the logo sits (top-left/top-right), monogram vs full, size relative to slide.
 - **Layout patterns** — grid (8/12-col), margins, headline placement (top vs centered), content-area shape.
 - **Numerical accents** — does the design use big numbers, callout boxes, percentage labels? Capture conventions.
