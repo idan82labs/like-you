@@ -1,0 +1,31 @@
+{
+  "name": "82labs",
+  "owner": {
+    "name": "Idan Tal",
+    "url": "https://82labs.com"
+  },
+  "description": "Skills from 82Labs for building agent-native businesses on top of Gmail, Calendar, Drive, Docs, and Sheets.",
+  "version": "0.1.0",
+  "plugins": [
+    {
+      "name": "like-you",
+      "source": "./plugins/like-you",
+      "description": "One-shot bootstrap of a ~/Business/.claude/ workspace from 90 days of Gmail/Calendar/Drive/Docs/Sheets. Produces CLAUDE.md, a /context/ entity graph, a voice.md style profile distilled from your sent mail, 5-10 business-specific generated skills split into content and judgment, and an automations.md spec for proactive triggers. Hebrew-first, English fallback. Local files accepted when MCPs are missing.",
+      "version": "0.1.0",
+      "category": "productivity",
+      "tags": [
+        "agents",
+        "second-brain",
+        "memory",
+        "gmail",
+        "calendar",
+        "drive",
+        "voice",
+        "automations",
+        "hebrew",
+        "claude-md"
+      ],
+      "strict": false
+    }
+  ]
+}

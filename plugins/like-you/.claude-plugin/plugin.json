@@ -1,0 +1,20 @@
+{
+  "name": "like-you",
+  "version": "0.1.0",
+  "description": "Bootstrap a ~/Business/.claude/ workspace from your Gmail, Calendar, Drive, Docs, and Sheets in 15 minutes. Generates a memory graph (/context), 5-10 business-specific skills split into content and judgment, a voice.md distilled from 50 of your real sent emails, and an automations.md spec for proactive triggers. Local-file fallback when MCPs are missing.",
+  "author": {
+    "name": "Idan Tal",
+    "url": "https://82labs.com"
+  },
+  "homepage": "https://github.com/idan82labs/like-you",
+  "license": "MIT",
+  "keywords": [
+    "agents",
+    "memory",
+    "knowledge-graph",
+    "voice",
+    "automations",
+    "claude-md",
+    "hebrew"
+  ]
+}
