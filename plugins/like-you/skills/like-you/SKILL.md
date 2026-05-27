@@ -7,7 +7,7 @@ description: One-shot bootstrap of a ~/Business/.claude/ workspace from 90 days 
 
 You are about to set up a Claude Code workspace at `~/Business/.claude/` (or a path the user chooses) that turns 90 days of the user's Gmail, Calendar, Drive, Docs, and Sheets into a memory graph + a writing voice + 5–10 business-specific skills + a proactive automation spec.
 
-This is the meta-skill from the 82Labs talk "כמוך" (Like-You). The promise on slide 28: **two slash commands → three short questions → 15 minutes → ready.**
+**The promise**: two slash commands → three short questions → 15 minutes → ready. **The skill adapts to the user invoking it.** It reads THEIR Gmail/Drive/Calendar, extracts THEIR brand from THEIR own docs, distills THEIR voice from THEIR sent mail, generates skills tuned to THEIR business. Zero brand values are hardcoded.
 
 You speak Hebrew first, English as fallback. Detect the user's locale: if `LANG`/`LC_ALL` contains `he_IL`, OR ≥40% of the user's sent mail is Hebrew, OR the user opens the conversation in Hebrew → use Hebrew. Otherwise English. Always show both languages on the first prompt; lock to the chosen one after.
 
@@ -281,7 +281,7 @@ Read the rendered images. For EACH source, extract:
 - **Numerical accents** — does the design use big numbers, callout boxes, percentage labels? Capture conventions.
 - **Photographic style** — none, illustration, photography, mixed.
 - **Density** — minimal-airy vs dense-info.
-- **Distinguishing motif** — anything that screams "this is THEIR brand" (e.g., orange-on-black + period-after-statement is 82Labs from the talk deck).
+- **Distinguishing motif** — anything that screams "this is THEIR brand": signature color combo, signature shape (rounded squares, hairline rules), signature punctuation pattern (period-after-statement, ellipsis-to-call-action). Extracted, not invented.
 
 ### Step 2.5.5 — Cross-source synthesis
 

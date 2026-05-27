@@ -157,7 +157,7 @@ Any participant in a thread whose email address matches one of these regex patte
 
 ### User-configurable bank list
 
-Banks are the tricky case. The deck's intended user (Idan @ 82Labs) has Mizrahi Bank as a *client*, not a private banking relationship — so the entire `mizrahi-tefahot.co.il` domain must NOT be skipped. Other banks the user has private accounts with should be skipped.
+Banks are the tricky case. A consultant or service provider may have a bank as a *client* (in which case the bank's domain must NOT be skipped — that's revenue correspondence). The same user may have private accounts with OTHER banks that should be skipped. The skill cannot guess which is which, so it asks.
 
 Phase 0.4 (orientation questions) asks:
 
