@@ -128,15 +128,40 @@ If user says `continue`, re-probe Calendar. If still missing or user picks the f
 
 **Nothing at all:** cold-start. Skip to Phase 4 after the 3 orientation questions, accept a pasted voice sample (≥200 words), write a stub `CLAUDE.md` and `seed-questions.md` with 8 questions whose answers let a future re-run produce something real.
 
-### Step 0.4 — Three orientation questions
+### Step 0.4 — Four orientation questions
 
-Ask exactly three. No more. These calibrate the extraction.
+Ask exactly four. No more. These calibrate the extraction AND determine which pipeline runs.
 
-1. **HE:** "במשפט: מה אתה עושה לחיים?" / **EN:** "In one sentence: what do you do?"
-2. **HE:** "3-5 שמות של אנשים שעובדים איתך הכי הרבה?" / **EN:** "3-5 names of the people you work with most?"
-3. **HE:** "איזה פרויקטים פעילים אצלך עכשיו?" / **EN:** "What projects are active for you right now?"
+**Q1 (CRITICAL — branches the whole skill):**
+> **HE:** "מה האג'נדה? **(א) עסק** — אני רוצה סוכן שמכיר לקוחות, פרויקטים, ועובד כמוני, **(ב) אישי** — אני רוצה סוכן שיעזור לי לנהל את החיים הפרטיים (משפחה, חברים, מטלות), **(ג) שניהם** — חיים מעורבבים, רוב ההתכתבות בחשבון אחד."
+>
+> **EN:** "What's the use case? (a) **Business** — I want an agent that knows my clients, projects, and writes like me. (b) **Personal** — I want help managing personal life (family, friends, errands). (c) **Both** — mixed life, most correspondence in one account."
 
-Persist the answers verbatim into `_meta/log.md`. Use them to bias entity extraction (these names get pre-seeded into `context/people/`).
+Lock answer into `_meta/confidence.json` as `use_case: business | personal | hybrid`. This determines what gets extracted and what skills get generated:
+
+| Use case | Phase 2 extracts | Phase 5 generates | Skip-list bias |
+|---|---|---|---|
+| `business` | people (relationship=client/partner/vendor), companies, projects | full catalog (5-10 skills, content + judgment) | aggressive skip of personal/family/medical/legal |
+| `personal` | people (close contacts only, ≥3 interactions), NO companies, NO projects | minimal: just `reply-email` + `triage-inbox` + `prioritize`. Skip everything else. | aggressive skip of work/invoice/contract/proposal terms |
+| `hybrid` | both, with explicit `personal_or_business:` tag on every entity | full catalog BUT every generated skill has a `scope_filter:` for personal vs business mail at runtime | both skip-lists merged; rely heavily on per-thread classification |
+
+The skill MUST refuse to proceed if the user picks `personal` AND the connected account has clear business signal (e.g., ≥3 distinct corporate domains in sent mail) — it asks them to confirm: "Your account looks like it has business correspondence too. Sure you want personal-only mapping? I'll filter business mail out aggressively."
+
+**Q2:** **HE:** "במשפט: מי אתה?" / **EN:** "In one sentence: who are you?"
+- For business: "what do you do for a living?"
+- For personal: "describe yourself — student/parent/retired/etc."
+- For hybrid: combination
+
+**Q3:** **HE:** "3-5 שמות של אנשים הכי קרובים אליך {בעבודה/בחיים}?" / **EN:** "3-5 names of the people closest to you {at work / in life}?"
+
+Question form changes per use_case: "people you work with" for business; "family + close friends" for personal; both for hybrid.
+
+**Q4 (business + hybrid only — skip for personal):**
+> **HE:** "איזה פרויקטים פעילים אצלך עכשיו?" / **EN:** "What projects are active for you right now?"
+
+For `personal`, replace Q4 with: "What's stressing you out lately? (recurring things you want help managing — bills, scheduling, family events, etc.)"
+
+Persist all answers verbatim into `_meta/log.md`. Use them to bias entity extraction (these names get pre-seeded into `context/people/`).
 
 ### Step 0.5 — Confirm path and scope
 
@@ -176,9 +201,17 @@ After Phase 1, count what landed. Update `_meta/confidence.json`. If counts are 
 
 ---
 
-## Phase 2 — Extract 4 entity types (≤3 min)
+## Phase 2 — Extract entities (≤3 min)
 
-Read `raw/` (cheap — it's local). Extract **people**, **companies**, **projects**, and **voice signal**.
+What gets extracted depends on `use_case` from Phase 0.4:
+
+| use_case | extracts | skips |
+|---|---|---|
+| `business` | people (clients/partners/vendors/colleagues), companies, projects, voice signal | family-only relationships, personal-only projects |
+| `personal` | people (close contacts only, ≥3 interactions), voice signal | companies, projects |
+| `hybrid` | everything, but every entity tagged `scope: business \| personal` | nothing |
+
+Read `raw/` (cheap — it's local). Extract per the table above.
 
 ### People
 - From Gmail: `From:`, `To:`, `Cc:` headers across all messages. Group by email address; merge by display-name similarity (≥0.85 Jaro-Winkler) only when domains match.
@@ -300,9 +333,19 @@ Prefer pattern-interrupt openings (`דן —`, `דן, שאלה קצרה.`) over 
 
 This is the differentiator. Most agent tools generate content skills. The judgment skills are what makes the system *act* like the user, not just *write* like them.
 
+### Catalog scoping by use_case
+
+| use_case | floor | ceiling | mandatory | excluded |
+|---|---|---|---|---|
+| `business` | 5 | 10 | reply-email, triage-inbox, prioritize | nothing |
+| `personal` | 2 | 4 | reply-email, prioritize | draft-proposal, design-deck, chase-nudge, when-to-escalate, respond-as-me-{client} (all business-only) |
+| `hybrid` | 5 | 10 | reply-email, triage-inbox, prioritize | nothing, but every generated skill gets a `scope_filter:` parameter so it can be invoked with `--scope=personal` or `--scope=business` |
+
+For `personal`, the agent should feel light — most users don't want a 10-skill toolkit just to manage their inbox. Generate the minimum that's useful. The `voice.md` work is still the load-bearing piece; everything else is thinner.
+
 ### Skill catalog rules
 
-For each skill in `references/skill-catalog.md`, evaluate its `precondition` against `_meta/entities.json` and the orientation answers. Score. Take top-N where 5 ≤ N ≤ 10. **Always include the three judgment defaults** regardless of score (they need very little data).
+For each skill in `references/skill-catalog.md`, evaluate its `precondition` against `_meta/entities.json` AND check it's not in the `use_case`-excluded list above. Score. Take top-N within the use_case bounds.
 
 | Skill | Folder | Precondition |
 |---|---|---|

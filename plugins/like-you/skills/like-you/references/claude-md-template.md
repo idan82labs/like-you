@@ -6,7 +6,9 @@ Fill placeholders in `{curly braces}`. Lines starting with `<!--` are comments â
 ---
 generated_by: like-you v0.1.0
 generated_at: {ISO timestamp}
+use_case: {business | personal | hybrid}
 mode: {full | preliminary | cold-start}
+business_identity: {primary email if known}
 confidence:
   gmail: {n_sent} sent in 90d
   calendar: {n_events} events in 90d

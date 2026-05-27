@@ -13,18 +13,30 @@ Phase 5 of `SKILL.md` walks this catalog and picks 5–10 skills based on what t
 
 ## Catalog
 
-| Skill | Folder | Always? | Precondition | Approx. effort to generate |
+| Skill | Folder | Always? | use_case | Precondition |
 |---|---|---|---|---|
-| `reply-email` | content | ✅ yes | none | 30s |
-| `triage-inbox` | judgment | ✅ yes | none | 30s |
-| `prioritize` | judgment | ✅ yes | none | 20s |
-| `end-of-day-summary` | content | ✅ yes | none | 20s |
-| `meeting-followup` | content | no | ≥5 calendar events with external attendees in 90d | 40s |
-| `draft-proposal` | content | no | ≥2 files in Drive with titles matching `proposal\|quote\|הצעה\|הצעת מחיר\|sow` | 1m |
-| `design-deck` | content | no | ≥1 file with mimeType `application/vnd.google-apps.presentation` OR title matches `deck\|presentation\|מצגת` | 30s |
-| `when-to-escalate` | judgment | no | ≥3 distinct sender→reply-latency patterns (≥5 messages each) detected | 40s |
-| `chase-nudge` | content | no | ≥2 follow-up emails detected (same recipient, ≥3 days apart, no reply between) AND user's voice.md intent rule allows nudging | 30s |
-| `respond-as-me-{client}` | content | no | top-quintile interaction frequency client AND ≥10 sent emails to that client. Cap: 2 total. | 1m each |
+| `reply-email` | content | ✅ yes | business + personal + hybrid | none |
+| `triage-inbox` | judgment | ✅ yes (business + hybrid) | business + hybrid | none |
+| `prioritize` | judgment | ✅ yes | business + personal + hybrid | none |
+| `end-of-day-summary` | content | yes (business + hybrid) | business + hybrid | none |
+| `meeting-followup` | content | no | business + hybrid | ≥5 calendar events with external attendees in 90d |
+| `draft-proposal` | content | no | business + hybrid | ≥2 files in Drive with titles matching `proposal\|quote\|הצעה\|הצעת מחיר\|sow` |
+| `design-deck` | content | no | business + hybrid | ≥1 file with mimeType `application/vnd.google-apps.presentation` OR title matches `deck\|presentation\|מצגת` |
+| `when-to-escalate` | judgment | no | business + hybrid | ≥3 distinct sender→reply-latency patterns (≥5 messages each) detected |
+| `chase-nudge` | content | no | business + hybrid | ≥2 follow-up emails detected (same recipient, ≥3 days apart, no reply between) AND user's voice.md intent rule allows nudging |
+| `respond-as-me-{client}` | content | no | business + hybrid | top-quintile interaction frequency client AND ≥10 sent emails to that client. Cap: 2 total. |
+| `family-bills` | content | no | personal + hybrid | ≥3 invoices/bills in inbox in 90d (utility/insurance/medical billing) |
+| `schedule-personal` | content | no | personal + hybrid | ≥5 personal calendar events with family/friends contacts |
+| `quick-reply` | content | no | personal | ≥10 short threads (<3 messages) to friends/family contacts |
+
+## use_case filter (applied BEFORE precondition scoring)
+
+If a row's `use_case` column doesn't include the user's `use_case` from Phase 0.4, **skip that skill entirely** — don't even evaluate precondition. This makes `personal` a tight pipeline that won't accidentally generate business skills just because the precondition data is there (e.g., the user happens to have a proposal in their Drive).
+
+After the filter:
+- `business` → up to 10 skills generated (existing behavior)
+- `personal` → 2-4 skills only (floor 2 ceiling 4). The always-on set is `reply-email` + `prioritize`. `family-bills` and `schedule-personal` are the conditional adds.
+- `hybrid` → up to 10, each tagged with `scope_filter:` for runtime invocation
 
 ## Scoring (if more than 10 candidates qualify)
 
